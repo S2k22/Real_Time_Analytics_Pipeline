@@ -29,6 +29,9 @@ The dataset used contains a list of sales and movement data (Montgomery County) 
 - **Dash/Plotly Dashboard**: Delivers interactive data visualizations and analytics
 - **Docker & Docker Compose**: Provides containerization for consistent deployment across environments
 
+![image](https://github.com/user-attachments/assets/a5e0a061-55bb-47df-a067-a51da50e009f)
+
+
 # Methodology
 ## ETL Process Methodology
 
