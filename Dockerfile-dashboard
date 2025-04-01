@@ -1,0 +1,23 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    default-libmysqlclient-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies with specific versions
+COPY requirements-dashboard.txt .
+RUN pip install --no-cache-dir -r requirements-dashboard.txt
+
+# Copy dashboard code - this file needs to exist before building
+# We'll create it with the new name to avoid conflicts
+COPY alchol_sales_dashboard.py .
+
+# Expose port for dashboard
+EXPOSE 8050
+
+# Command to run the dashboard
+CMD ["python", "alchol_sales_dashboard.py"]

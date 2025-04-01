@@ -1,0 +1,124 @@
+version: '3'
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: mysql+mysqldb://airflow:airflow@mysql/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: mysql+mysqldb://airflow:airflow@mysql/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    # MySQL Connection Variables for our DAG
+    MYSQL_HOST: mysql
+    MYSQL_DB: alcohol_sales_dw
+    MYSQL_USER: airflow
+    MYSQL_PASSWORD: airflow
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./data:/opt/airflow/data
+    - ./sql_scripts:/opt/airflow/sql_scripts
+    - ./staging:/opt/airflow/staging
+    - ./processed:/opt/airflow/processed
+    - ./transformed:/opt/airflow/transformed
+  depends_on:
+    mysql:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=airflow
+      - MYSQL_USER=airflow
+      - MYSQL_PASSWORD=airflow
+      - MYSQL_DATABASE=airflow
+    volumes:
+      - mysql-db-volume:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "airflow", "-pairflow"]
+      interval: 5s
+      retries: 5
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/dags /opt/airflow/logs /opt/airflow/plugins /opt/airflow/data /opt/airflow/sql_scripts /opt/airflow/staging /opt/airflow/processed /opt/airflow/transformed
+        airflow db init
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+        # Create required connections
+        airflow connections add 'mysql_default' \
+          --conn-type 'mysql' \
+          --conn-login 'airflow' \
+          --conn-password 'airflow' \
+          --conn-host 'mysql' \
+          --conn-port '3306' \
+          --conn-schema 'alcohol_sales_dw'
+        # Create required variables
+        airflow variables set mysql_host mysql
+        airflow variables set mysql_db alcohol_sales_dw
+        airflow variables set mysql_user airflow
+        airflow variables set mysql_password airflow
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile-dashboard
+    ports:
+      - "8050:8050"
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DB=alcohol_sales_dw
+      - MYSQL_USER=airflow
+      - MYSQL_PASSWORD=airflow
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql-db-volume:
