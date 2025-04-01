@@ -125,6 +125,7 @@ missing_pct = (missing_count / len(df)) * 100
     outlier_count = outliers.sum()
     outlier_pct = (outlier_count / len(values)) * 100
 ```
+![image](https://github.com/user-attachments/assets/e5f210cb-ba9b-4026-b0ad-d8f8a5ed00d2)
 
 ## Dashboard Methodology
 ### Visualization Selection Rationale:
